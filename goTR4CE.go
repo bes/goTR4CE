@@ -27,7 +27,7 @@ const WindowHeight = 512
 var screenData = make([]uint8, WindowHeight*WindowWidth*3) //RGB
 
 // The position in screenData where we are going to write next
-var arrayPos int
+var arrayPos []int
 
 // The OpenGL id of the texture
 var texture uint32
@@ -114,9 +114,18 @@ func main() {
 	angle := 0.0
 	previousTime := glfw.GetTime()
 
-	colorChannel := make(chan *Color, 1000)
+	runtime.GOMAXPROCS(4)
 
-	go RunRender(colorChannel, WindowWidth, WindowHeight)
+	colorChannels := make([]chan *Color, 3)
+	for i := range colorChannels {
+		colorChannels[i] = make(chan *Color, 100000)
+	}
+
+	numChans, numPixelsPerChan := RunRender(colorChannels, WindowWidth, WindowHeight)
+	arrayPos = make([]int, numChans)
+	for i := range arrayPos {
+		arrayPos[i] = i * numPixelsPerChan * 3 //RGB
+	}
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -135,7 +144,7 @@ func main() {
 
 		gl.BindVertexArray(vao)
 
-		updateTexture(colorChannel)
+		updateTexture(colorChannels)
 
 		gl.DrawArrays(gl.TRIANGLES, 0, int32(len(cubeVertices)/5))
 
@@ -215,26 +224,27 @@ func setupModifiableTexture() {
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, WindowWidth, WindowHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(screenData))
 }
 
-func updateTexture(colorChannel chan *Color) {
+func updateTexture(colorChannels []chan *Color) {
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 
-	numColors := len(colorChannel)
+	for j, colorChannel := range colorChannels {
 
-	for i := 0; i < numColors; i++ {
-		color := <-colorChannel
-		//fmt.Println(color)
-		if color == nil {
-			screenData[arrayPos] = 0
-			screenData[arrayPos+1] = 0
-			screenData[arrayPos+2] = 0
-		} else {
-			screenData[arrayPos] = color.GetRed()
-			screenData[arrayPos+1] = color.GetGreen()
-			screenData[arrayPos+2] = color.GetBlue()
+		numColors := len(colorChannel)
+		for i := 0; i < numColors; i++ {
+			color := <-colorChannel
+			if color == nil {
+				screenData[arrayPos[j]] = 0
+				screenData[arrayPos[j]+1] = 0
+				screenData[arrayPos[j]+2] = 0
+			} else {
+				screenData[arrayPos[j]] = color.GetRed()
+				screenData[arrayPos[j]+1] = color.GetGreen()
+				screenData[arrayPos[j]+2] = color.GetBlue()
+			}
+
+			arrayPos[j] += 3
 		}
-
-		arrayPos += 3
 	}
 
 	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, WindowWidth, WindowHeight, gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(screenData))

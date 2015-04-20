@@ -55,11 +55,22 @@ func (w *World) SetEye(e *Eye) {
 	w.eye = e
 }
 
-func (w *World) Render(ch chan *Color) {
-	//xstep := float64(1) / float64(w.width)
-	//ystep := float64(1) / float64(w.height)
-	for y := 0; y < w.raster.GetHeight(); y++ {
-		for x := 0; x < w.raster.GetWidth(); x++ {
+// rangeStart is inclusve, rangeEnd is exclusive
+func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
+
+	yStart := int(rangeStart / w.GetWidth())
+	yEnd := int(rangeEnd / w.GetWidth())
+
+	xStart := rangeStart % w.raster.GetWidth()
+	xEnd := rangeEnd % w.raster.GetWidth()
+	if xEnd > 0 {
+		yEnd++
+	}
+
+	progress := rangeStart
+	for y := yStart; y < yEnd; y++ {
+		for x := xStart; x < w.raster.GetWidth(); x++ {
+			xStart = 0
 			rasterPos := w.raster.GetPoint(x, y)
 
 			mc := NewColor()
@@ -88,6 +99,10 @@ func (w *World) Render(ch chan *Color) {
 				ch <- mc
 			} else {
 				ch <- nil
+			}
+			progress++
+			if progress == rangeEnd {
+				break
 			}
 		}
 	}

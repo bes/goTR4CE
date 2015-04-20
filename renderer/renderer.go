@@ -4,7 +4,7 @@ import (
 	"math"
 )
 
-func RunRender(colorChan chan *Color, width, height int) {
+func RunRender(colorChans []chan *Color, width, height int) (int, int) {
 	depth := 50
 	w := NewWorld(width, height, depth)
 
@@ -24,5 +24,21 @@ func RunRender(colorChan chan *Color, width, height int) {
 	w.SetEye(e)
 	w.SetRaster(NewRaster(width, height, e, math.Pi/4))
 
-	w.Render(colorChan)
+	numChans := len(colorChans)
+	totalPixels := width * height
+	numPixelsPerChan := int(totalPixels / numChans)
+
+	rangeStart := 0
+	rangeEnd := numPixelsPerChan
+	for i := 0; i < numChans-1; i++ {
+		// rangeStart is inclusive
+		// rangeEnd is exclusive
+		go w.Render(colorChans[i], rangeStart, rangeEnd)
+		rangeStart = rangeEnd
+		rangeEnd += numPixelsPerChan
+	}
+
+	go w.Render(colorChans[numChans-1], rangeStart, totalPixels)
+
+	return numChans, numPixelsPerChan
 }
