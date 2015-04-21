@@ -3,21 +3,29 @@ package renderer
 import ()
 
 type Plane struct {
-	p                                     *Point3D
-	d, a, diff, s, reflection, refraction float64
-	c                                     *Color
+	p0                                 *Point3D // Point on the plane
+	n                                  *Point3D // Normal to the plane
+	a, diff, s, reflection, refraction float64
+	c                                  *Color
 }
 
-func NewPlane(p *Point3D, d, a, diff, s, reflection, refraction float64, c *Color) *Plane {
-	return &Plane{p, d, a, diff, s, reflection, refraction, c}
+func NewPlane(p0, n *Point3D, a, diff, s, reflection, refraction float64, c *Color) *Plane {
+	return &Plane{p0, n.Normalize(), a, diff, s, reflection, refraction, c}
 }
 
 func (pl *Plane) Intersects(r *Ray, w *World) *Point3D {
+	// N plane normal
+	// Q point on plane
+	// E eye point
+	// D eye Vector
+
+	// N *(Q - E) / N * D
+
 	var i *Point3D
-	dp := pl.p.Dot(r.GetVector())
+	dp := pl.n.Dot(r.GetVector())
 	if dp != 0 {
-		t := -(pl.p.Dot(r.GetPoint()) + pl.d) / dp
-		if t > 0 {
+		t := pl.p0.Minus(r.GetPoint()).Dot(pl.n) / dp
+		if t >= 0 {
 			i = r.GetPoint().Plus(r.GetVector().Scale(t))
 		}
 	}
@@ -29,7 +37,7 @@ func (pl *Plane) GetColor() *Color {
 }
 
 func (pl *Plane) GetNormal(p *Point3D) *Point3D {
-	return pl.p
+	return pl.n
 }
 
 func (pl *Plane) Ambient() float64 {

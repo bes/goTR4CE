@@ -20,8 +20,8 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-const WindowWidth = 512
-const WindowHeight = 512
+const WindowWidth = 1024
+const WindowHeight = 1024
 
 // The pixels of our texture, which we render into
 var screenData = make([]uint8, WindowHeight*WindowWidth*3) //RGB
@@ -114,9 +114,9 @@ func main() {
 	angle := 0.0
 	previousTime := glfw.GetTime()
 
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(10)
 
-	colorChannels := make([]chan *Color, 3)
+	colorChannels := make([]chan *Color, 10)
 	for i := range colorChannels {
 		colorChannels[i] = make(chan *Color, 100000)
 	}

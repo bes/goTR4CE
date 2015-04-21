@@ -87,7 +87,7 @@ func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
 					r := NewRay(w.eye.GetPos().Plus(w.raster.GetXV().Scale(i).Plus(w.raster.GetYV().Scale(j))),
 						rasterPos.Minus(w.eye.GetPos()).Normalize())
 
-					tc := w.trace(r, 3, 1)
+					tc := w.trace(r, 10, 1)
 					if tc != nil {
 						colorSet = true
 						mc.AddColor(tc.r/contribAa, tc.g/contribAa, tc.b/contribAa)
