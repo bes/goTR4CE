@@ -50,6 +50,8 @@ func (w *World) SetRaster(r *Raster) {
 	w.raster = r
 }
 
+const renderDepth = 6
+
 // rangeStart is inclusve, rangeEnd is exclusive
 func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
 
@@ -70,7 +72,7 @@ func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
 
 			rvec := rasterRay.GetVector()
 			r := NewRay(rasterRay.GetPoint(), rvec)
-			colorSet, mc := w.traceAA(r, 10, 1)
+			colorSet, mc := w.traceAA(r, renderDepth, 1)
 
 			if colorSet {
 				ch <- mc
@@ -86,9 +88,9 @@ func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
 }
 
 func (w *World) traceAA(r *Ray, cutoff int, nju1 float64) (bool, *Color) {
-	startAa := -0.4
-	endAa := 0.4
-	stepAa := 0.2
+	startAa := -0.8
+	endAa := 0.8
+	stepAa := 0.4
 	contribAa := ((endAa - startAa) / stepAa)
 
 	colorSet := false
@@ -98,9 +100,10 @@ func (w *World) traceAA(r *Ray, cutoff int, nju1 float64) (bool, *Color) {
 		rvec := r.GetVector()
 
 		// Bad antialiasing... can do much better
-		r := NewRay(r.GetPoint().Plus(NewPoint3D(i, i, i)), rvec)
+		factor := float64(cutoff) / renderDepth
+		r := NewRay(r.GetPoint().Plus(NewPoint3D(i*factor, i*factor, i*factor)), rvec)
 
-		tc := w.trace(r, 10, 1)
+		tc := w.trace(r, cutoff-1, nju1)
 		if tc != nil {
 			colorSet = true
 			mc.AddColor(tc.r/contribAa, tc.g/contribAa, tc.b/contribAa)
@@ -151,7 +154,7 @@ func (w *World) trace(r *Ray, cutoff int, nju1 float64) *Color {
 		}
 
 		if s.Reflection() > 0 {
-			colorSet, c := w.traceAA(NewRay(point, R), cutoff-1, 1)
+			colorSet, c := w.traceAA(NewRay(point, R), cutoff, 1)
 			if colorSet {
 				red += s.Reflection() * c.r
 				green += s.Reflection() * c.g
@@ -173,7 +176,7 @@ func (w *World) trace(r *Ray, cutoff int, nju1 float64) *Color {
 			// There are some other variants in the java code
 			t := r.GetVector().Scale(nju).Plus(N.Scale(nju*c1 - c2))
 
-			colorSet, c := w.traceAA(NewRay(point.Plus(t.Scale(1)), t), cutoff-1, nju2)
+			colorSet, c := w.traceAA(NewRay(point.Plus(t.Scale(1)), t), cutoff, nju2)
 
 			if colorSet {
 				red += c.r

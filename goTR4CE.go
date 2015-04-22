@@ -20,8 +20,8 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-const WindowWidth = 1024
-const WindowHeight = 1024
+const WindowWidth = 512
+const WindowHeight = 512
 
 // The pixels of our texture, which we render into
 var screenData = make([]uint8, WindowHeight*WindowWidth*3) //RGB
