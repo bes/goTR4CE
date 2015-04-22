@@ -9,7 +9,6 @@ type World struct {
 	lights []Light
 
 	raster *Raster
-	eye    *Eye
 
 	width, height, depth int
 }
@@ -51,10 +50,6 @@ func (w *World) SetRaster(r *Raster) {
 	w.raster = r
 }
 
-func (w *World) SetEye(e *Eye) {
-	w.eye = e
-}
-
 // rangeStart is inclusve, rangeEnd is exclusive
 func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
 
@@ -71,29 +66,11 @@ func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
 	for y := yStart; y < yEnd; y++ {
 		for x := xStart; x < w.raster.GetWidth(); x++ {
 			xStart = 0
-			rasterPos := w.raster.GetPoint(x, y)
+			rasterRay := w.raster.GetRay(x, y)
 
-			mc := NewColor()
-
-			colorSet := false
-
-			// This antialiasing should move into the trace method, since here it will only provide one level of AA
-			startAa := -0.4
-			endAa := 0.4
-			stepAa := 0.4
-			contribAa := ((endAa - startAa) / stepAa) * ((endAa - startAa) / stepAa)
-			for i := startAa; i < endAa; i += stepAa {
-				for j := startAa; j < endAa; j += stepAa {
-					r := NewRay(w.eye.GetPos().Plus(w.raster.GetXV().Scale(i).Plus(w.raster.GetYV().Scale(j))),
-						rasterPos.Minus(w.eye.GetPos()).Normalize())
-
-					tc := w.trace(r, 10, 1)
-					if tc != nil {
-						colorSet = true
-						mc.AddColor(tc.r/contribAa, tc.g/contribAa, tc.b/contribAa)
-					}
-				}
-			}
+			rvec := rasterRay.GetVector()
+			r := NewRay(rasterRay.GetPoint(), rvec)
+			colorSet, mc := w.traceAA(r, 10, 1)
 
 			if colorSet {
 				ch <- mc
@@ -106,6 +83,31 @@ func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
 			}
 		}
 	}
+}
+
+func (w *World) traceAA(r *Ray, cutoff int, nju1 float64) (bool, *Color) {
+	startAa := -0.4
+	endAa := 0.4
+	stepAa := 0.2
+	contribAa := ((endAa - startAa) / stepAa)
+
+	colorSet := false
+	mc := NewColor()
+
+	for i := startAa; i < endAa; i += stepAa {
+		rvec := r.GetVector()
+
+		// Bad antialiasing... can do much better
+		r := NewRay(r.GetPoint().Plus(NewPoint3D(i, i, i)), rvec)
+
+		tc := w.trace(r, 10, 1)
+		if tc != nil {
+			colorSet = true
+			mc.AddColor(tc.r/contribAa, tc.g/contribAa, tc.b/contribAa)
+		}
+	}
+
+	return colorSet, mc
 }
 
 func (w *World) trace(r *Ray, cutoff int, nju1 float64) *Color {
@@ -136,7 +138,8 @@ func (w *World) trace(r *Ray, cutoff int, nju1 float64) *Color {
 				La := rs.GetVector().Normalize()
 				LN := La.Dot(N)
 
-				V := w.eye.GetPos().Minus(point).Normalize()
+				//V := w.eye.GetPos().Minus(point).Normalize()
+				V := r.GetPoint().Minus(point).Normalize()
 
 				rvAlphaPow := alphaPow(math.Max(0, R.Dot(V)), 8)
 
@@ -148,10 +151,12 @@ func (w *World) trace(r *Ray, cutoff int, nju1 float64) *Color {
 		}
 
 		if s.Reflection() > 0 {
-			c := w.trace(NewRay(point, R), cutoff-1, 1)
-			red += s.Reflection() * c.r
-			green += s.Reflection() * c.g
-			blue += s.Reflection() * c.b
+			colorSet, c := w.traceAA(NewRay(point, R), cutoff-1, 1)
+			if colorSet {
+				red += s.Reflection() * c.r
+				green += s.Reflection() * c.g
+				blue += s.Reflection() * c.b
+			}
 		}
 
 		if s.Refraction() > 0 {
@@ -168,11 +173,13 @@ func (w *World) trace(r *Ray, cutoff int, nju1 float64) *Color {
 			// There are some other variants in the java code
 			t := r.GetVector().Scale(nju).Plus(N.Scale(nju*c1 - c2))
 
-			c := w.trace(NewRay(point.Plus(t.Scale(1)), t), cutoff-1, nju2)
+			colorSet, c := w.traceAA(NewRay(point.Plus(t.Scale(1)), t), cutoff-1, nju2)
 
-			red += c.r
-			green += c.g
-			blue += c.b
+			if colorSet {
+				red += c.r
+				green += c.g
+				blue += c.b
+			}
 		}
 
 		mc.AddColor(s.Ambient()*s.GetColor().r+red,

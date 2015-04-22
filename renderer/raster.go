@@ -5,26 +5,28 @@ import (
 )
 
 type Raster struct {
-	width, height int
-	fov           float64
-	eye           *Eye
-	pos, xV, yV   *Point3D
+	width, height             int
+	fov                       float64
+	pos, eyePos, eyeDirection *Point3D
+	xV, yV                    *Point3D
 }
 
 // fov in radians
-func NewRaster(width, height int, eye *Eye, fov float64) *Raster {
+func NewRaster(width, height int, rasterPos, eyeDirection *Point3D, fov float64) *Raster {
 	result := new(Raster)
 	result.width = width
 	result.height = height
-	result.eye = eye
 	result.fov = fov
 
 	dist := (float64(width) / 2) / math.Tan(fov/2)
 
-	result.pos = eye.GetPos().Plus(eye.GetDirection().Scale(dist))
+	result.pos = rasterPos
+	result.eyePos = rasterPos.Minus(eyeDirection.Scale(dist))
+	result.eyeDirection = eyeDirection
 
-	result.xV = eye.GetDirection().RotateY90CCW()
-	result.yV = eye.GetDirection().RotateX90CCW()
+	// TODO: I don't think this is correct
+	result.xV = eyeDirection.RotateY90CCW()
+	result.yV = eyeDirection.RotateX90CCW()
 
 	return result
 }
@@ -45,8 +47,10 @@ func (r *Raster) GetYV() *Point3D {
 	return r.yV
 }
 
-func (r *Raster) GetPoint(x, y int) *Point3D {
+func (r *Raster) GetRay(x, y int) *Ray {
 	xlen := (-float64(r.width) / 2) + float64(x)
 	ylen := (-float64(r.height) / 2) + float64(y)
-	return r.pos.Plus(r.xV.Scale(float64(xlen))).Plus(r.yV.Scale(float64(ylen)))
+	pointPos := r.pos.Plus(r.xV.Scale(float64(xlen))).Plus(r.yV.Scale(float64(ylen)))
+	rayDirection := pointPos.Minus(r.eyePos).Normalize()
+	return NewRay(r.eyePos, rayDirection)
 }

@@ -7,17 +7,11 @@ type Ray struct {
 }
 
 func NewRayValues(x, y, z, xV, yV, zV float64) *Ray {
-	result := new(Ray)
-	result.point = NewPoint3D(xV, yV, zV)
-	result.vector = NewPoint3D(x, y, z)
-	return result
+	return &Ray{NewPoint3D(xV, yV, zV), NewPoint3D(x, y, z)}
 }
 
 func NewRay(point, vector *Point3D) *Ray {
-	result := new(Ray)
-	result.point = point
-	result.vector = vector
-	return result
+	return &Ray{point, vector}
 }
 
 func (r *Ray) GetVector() *Point3D {
