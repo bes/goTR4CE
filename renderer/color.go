@@ -9,12 +9,7 @@ type Color struct {
 }
 
 func NewColorRgb(r, g, b float64) *Color {
-	result := new(Color)
-	result.r = r
-	result.g = g
-	result.b = b
-
-	return result
+	return &Color{r, g, b}
 }
 
 func NewColor() *Color {

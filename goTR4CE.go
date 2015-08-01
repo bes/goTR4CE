@@ -14,6 +14,7 @@ import (
 	"math"
 	"runtime"
 	"strings"
+	//"time"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.1/glfw"
@@ -22,12 +23,10 @@ import (
 
 const WindowWidth = 512
 const WindowHeight = 512
+const GoRoutines = WindowWidth * WindowHeight
 
 // The pixels of our texture, which we render into
 var screenData = make([]uint8, WindowHeight*WindowWidth*3) //RGB
-
-// The position in screenData where we are going to write next
-var arrayPos []int
 
 // The OpenGL id of the texture
 var texture uint32
@@ -116,16 +115,10 @@ func main() {
 
 	runtime.GOMAXPROCS(10)
 
-	colorChannels := make([]chan *Color, 10)
-	for i := range colorChannels {
-		colorChannels[i] = make(chan *Color, 100000)
-	}
+	colorChannels := make(chan *ColorData, GoRoutines)
 
-	numChans, numPixelsPerChan := RunRender(colorChannels, WindowWidth, WindowHeight)
-	arrayPos = make([]int, numChans)
-	for i := range arrayPos {
-		arrayPos[i] = i * numPixelsPerChan * 3 //RGB
-	}
+	depth := 5
+	RunRender(colorChannels, depth, WindowWidth, WindowHeight)
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -224,30 +217,24 @@ func setupModifiableTexture() {
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, WindowWidth, WindowHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(screenData))
 }
 
-func updateTexture(colorChannels []chan *Color) {
+func updateTexture(colorChannel chan *ColorData) {
+	defer func() {
+		gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, WindowWidth, WindowHeight, gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(screenData))
+	}()
+
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 
-	for j, colorChannel := range colorChannels {
-
-		numColors := len(colorChannel)
-		for i := 0; i < numColors; i++ {
-			color := <-colorChannel
-			if color == nil {
-				screenData[arrayPos[j]] = 0
-				screenData[arrayPos[j]+1] = 0
-				screenData[arrayPos[j]+2] = 0
-			} else {
-				screenData[arrayPos[j]] = color.GetRed()
-				screenData[arrayPos[j]+1] = color.GetGreen()
-				screenData[arrayPos[j]+2] = color.GetBlue()
-			}
-
-			arrayPos[j] += 3
-		}
+	numColors := len(colorChannel)
+	for i := 0; float64(i) < math.Min(float64(numColors), float64(10000)); i++ {
+		colordata := <-colorChannel
+		color := colordata.GetColor()
+		offset := colordata.GetOffset()
+		screenData[offset*3] = color.GetRed()
+		screenData[offset*3+1] = color.GetGreen()
+		screenData[offset*3+2] = color.GetBlue()
 	}
 
-	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, WindowWidth, WindowHeight, gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(screenData))
 }
 
 var vertexShader string = `

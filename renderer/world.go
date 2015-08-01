@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	//	"fmt"
 	"math"
 )
 
@@ -50,47 +51,24 @@ func (w *World) SetRaster(r *Raster) {
 	w.raster = r
 }
 
-const renderDepth = 6
+func (w *World) Render(ch chan *ColorData, x, y int) {
+	rasterRay := w.raster.GetRay(x, y)
 
-// rangeStart is inclusve, rangeEnd is exclusive
-func (w *World) Render(ch chan *Color, rangeStart, rangeEnd int) {
+	rvec := rasterRay.GetVector()
+	r := NewRay(rasterRay.GetPoint(), rvec)
+	colorSet, mc := w.traceAA(r, w.GetDepth(), 1)
 
-	yStart := int(rangeStart / w.GetWidth())
-	yEnd := int(rangeEnd / w.GetWidth())
-
-	xStart := rangeStart % w.raster.GetWidth()
-	xEnd := rangeEnd % w.raster.GetWidth()
-	if xEnd > 0 {
-		yEnd++
-	}
-
-	progress := rangeStart
-	for y := yStart; y < yEnd; y++ {
-		for x := xStart; x < w.raster.GetWidth(); x++ {
-			xStart = 0
-			rasterRay := w.raster.GetRay(x, y)
-
-			rvec := rasterRay.GetVector()
-			r := NewRay(rasterRay.GetPoint(), rvec)
-			colorSet, mc := w.traceAA(r, renderDepth, 1)
-
-			if colorSet {
-				ch <- mc
-			} else {
-				ch <- nil
-			}
-			progress++
-			if progress == rangeEnd {
-				break
-			}
-		}
+	if colorSet {
+		ch <- NewColorData(mc, uint32(y*w.GetWidth()+x))
+	} else {
+		ch <- nil
 	}
 }
 
 func (w *World) traceAA(r *Ray, cutoff int, nju1 float64) (bool, *Color) {
-	startAa := -0.8
-	endAa := 0.8
-	stepAa := 0.4
+	startAa := -0.4
+	endAa := 0.4
+	stepAa := 0.2
 	contribAa := ((endAa - startAa) / stepAa)
 
 	colorSet := false
@@ -100,7 +78,7 @@ func (w *World) traceAA(r *Ray, cutoff int, nju1 float64) (bool, *Color) {
 		rvec := r.GetVector()
 
 		// Bad antialiasing... can do much better
-		factor := float64(cutoff) / renderDepth
+		factor := float64(cutoff) / float64(w.GetDepth())
 		r := NewRay(r.GetPoint().Plus(NewPoint3D(i*factor, i*factor, i*factor)), rvec)
 
 		tc := w.trace(r, cutoff-1, nju1)

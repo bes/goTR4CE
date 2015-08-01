@@ -1,17 +1,19 @@
 package renderer
 
 import (
+	//	"fmt"
 	"math"
+	"runtime"
 )
 
-func RunRender(colorChans []chan *Color, width, height int) (int, int) {
-	depth := 50
+func RunRender(colorChans chan *ColorData, depth, width, height int) {
 	w := NewWorld(width, height, depth)
 
+	//                                 Sphere: p, a, d, s, r, refract, reflect float64, c *Color
 	w.AddShape(NewSphere(NewPoint3D(-80, 0, 700), 0.5, 0.3, 0.5, 50, 0, 0, NewColorRgb(255, 255, 0)))
 	w.AddShape(NewSphere(NewPoint3D(80, 0, 800), 0.5, 0.3, 0.5, 50, 0, 0, NewColorRgb(255, 0, 255)))
 	w.AddShape(NewSphere(NewPoint3D(0, 10, 400), 0, 0.1, 0.1, 60, 2, 0, NewColorRgb(255, 255, 255)))
-	//w.AddShape(NewSphere(NewPoint3D(80, 30, 180), 0.1, 0.4, 0.2, 60, 0, 0, NewColorRgb(255, 255, 255)))
+	w.AddShape(NewSphere(NewPoint3D(80, 200, 1600), 0.1, 0.4, 0.2, 250, 0, 0.5, NewColorRgb(120, 120, 120)))
 
 	w.AddShape(NewPlane(NewPoint3D(0, -50, 0), NewPoint3D(0, 1, 0), 0.4, 0.9, 0.3, 0, 0, NewColorRgb(100, 90, 100)))
 
@@ -25,21 +27,12 @@ func RunRender(colorChans []chan *Color, width, height int) (int, int) {
 
 	w.SetRaster(NewRaster(width, height, NewPoint3D(0, 100, 0), NewPoint3D(0, 0, 1).Normalize(), math.Pi/4))
 
-	numChans := len(colorChans)
-	totalPixels := width * height
-	numPixelsPerChan := int(totalPixels / numChans)
-
-	rangeStart := 0
-	rangeEnd := numPixelsPerChan
-	for i := 0; i < numChans-1; i++ {
-		// rangeStart is inclusive
-		// rangeEnd is exclusive
-		go w.Render(colorChans[i], rangeStart, rangeEnd)
-		rangeStart = rangeEnd
-		rangeEnd += numPixelsPerChan
-	}
-
-	go w.Render(colorChans[numChans-1], rangeStart, totalPixels)
-
-	return numChans, numPixelsPerChan
+	go func() {
+		for x := 0; x < width; x++ {
+			for y := 0; y < height; y++ {
+				go w.Render(colorChans, x, y)
+			}
+			runtime.Gosched()
+		}
+	}()
 }
