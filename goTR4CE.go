@@ -7,9 +7,9 @@
 package main
 
 import (
-	. "./renderer"
 	"errors"
 	"fmt"
+	. "github.com/bes/goTR4CE/renderer"
 	"log"
 	"math"
 	"runtime"
@@ -21,8 +21,8 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-const WindowWidth = 512
-const WindowHeight = 512
+const WindowWidth = 1024
+const WindowHeight = 1024
 const GoRoutines = WindowWidth * WindowHeight
 
 // The pixels of our texture, which we render into
